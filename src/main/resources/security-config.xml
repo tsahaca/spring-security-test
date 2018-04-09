@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+	xmlns:beans="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/security
+    http://www.springframework.org/schema/security/spring-security.xsd">
+
+	<!-- Spring security config should go here	-->
+	
+	<global-method-security jsr250-annotations="enabled" />
+
+	<http entry-point-ref="preAuthenticatedProcessingFilterEntryPoint"
+		use-expressions="true" auto-config="false">
+		<custom-filter ref="preauthFilter" position="PRE_AUTH_FILTER" />
+		<intercept-url pattern="/*" access="isAuthenticated()" />
+		<access-denied-handler ref="accessDeniedHandler" />
+		<logout logout-success-url="/views/person.html" />
+	</http>
+
+	<beans:bean id="preAuthenticatedProcessingFilterEntryPoint"
+		class="org.springframework.security.web.authentication.Http403ForbiddenEntryPoint" />
+
+	<beans:bean id="preauthFilter"
+		class="com.test.security.PreAuthenticationFilter">
+		<beans:property name="authenticationManager" ref="authenticationManager" />
+	</beans:bean>
+
+	<beans:bean id="preauthAuthProvider"
+		class="org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationProvider">
+		<beans:property name="preAuthenticatedUserDetailsService">
+			<beans:bean id="userDetailsServiceWrapper"
+				class="org.springframework.security.core.userdetails.UserDetailsByNameServiceWrapper">
+				<beans:property name="userDetailsService"
+					ref="customUserDetailsService" />
+			</beans:bean>
+		</beans:property>
+	</beans:bean>
+
+	<authentication-manager alias="authenticationManager">
+		<authentication-provider ref="preauthAuthProvider" />
+	</authentication-manager>
+
+
+	<beans:bean id="accessDeniedHandler" class="test.AccessHandler" />
+
+	<beans:bean id="customUserDetailsService"
+		class="test.JdbcLdapUserDetailsService">
+
+		<beans:constructor-arg>
+			<beans:ref bean="iamDS" />
+		</beans:constructor-arg>
+
+		<beans:constructor-arg>
+			<beans:ref bean="ldapContextSource" />
+		</beans:constructor-arg>
+
+		<beans:constructor-arg>
+			<beans:value>select login_id username, 'password'
+				&quot;password&quot; , 1 enabled from user where
+				lower(login_id)=lower(?)</beans:value>
+		</beans:constructor-arg>
+
+
+		<beans:constructor-arg>
+			<beans:value>select u.login_id username , g.group_name
+				authority from user u, group g, user_group ug where
+				lower(u.login_id)=lower(?) and u.user_id=ug.user_id and
+				g.user_group_key=ug.user_group_key</beans:value>
+		</beans:constructor-arg>
+		
+		
+        <beans:constructor-arg>
+            <beans:value>OU=Users,OU=Location</beans:value>
+        </beans:constructor-arg>
+		
+		<beans:constructor-arg>
+            <beans:value>sAMAccountName={0}</beans:value>
+        </beans:constructor-arg>
+		
+        <beans:constructor-arg>
+            <beans:value>OU=Groups,OU=Location</beans:value>
+        </beans:constructor-arg>
+
+	</beans:bean>
+
+	<beans:bean id="ldapContextSource"
+		class="org.springframework.ldap.core.support.LdapContextSource">
+		<beans:property name="url" value="ldaps://localhost:636" />
+		<beans:property name="userDn" value="admin" />
+		<beans:property name="password" value="password" />
+		<beans:property name="base" value="DC=qa,DC=root,DC=local" />
+		<beans:property name="referral" value="follow" />
+	</beans:bean>
+  
+</beans:beans>
